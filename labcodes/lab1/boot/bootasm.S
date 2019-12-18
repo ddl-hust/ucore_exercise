@@ -17,7 +17,7 @@ start:
     cld                                             # String operations increment
 
     # Set up the important data segment registers (DS, ES, SS).
-    xorw %ax, %ax                                   # Segment number zero
+    xorw %ax, %ax                                   # Segment number zero 自己和自己亦或为0
     movw %ax, %ds                                   # -> Data Segment
     movw %ax, %es                                   # -> Extra Segment
     movw %ax, %ss                                   # -> Stack Segment
@@ -28,7 +28,7 @@ start:
     #  1MB wrap around to zero by default. This code undoes this.
 seta20.1:
     inb $0x64, %al                                  # Wait for not busy(8042 input buffer empty).
-    testb $0x2, %al
+    testb $0x2, %al                                 # https://stackoverflow.com/questions/21078932/why-test-port-0x64-in-a-bootloader-before-switching-into-protected-mode
     jnz seta20.1
 
     movb $0xd1, %al                                 # 0xd1 -> port 0x64

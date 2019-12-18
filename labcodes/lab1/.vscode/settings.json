@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "trap.h": "c",
+        "limits": "c"
+    }
+}

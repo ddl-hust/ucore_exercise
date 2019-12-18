@@ -60,6 +60,7 @@ struct pushregs {
 };
 
 struct trapframe {
+    //below are define by software
     struct pushregs tf_regs;
     uint16_t tf_gs;
     uint16_t tf_padding0;
@@ -69,7 +70,7 @@ struct trapframe {
     uint16_t tf_padding2;
     uint16_t tf_ds;
     uint16_t tf_padding3;
-    uint32_t tf_trapno;
+    uint32_t tf_trapno; //****
     /* below here defined by x86 hardware */
     uint32_t tf_err;
     uintptr_t tf_eip;
