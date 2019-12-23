@@ -1,16 +1,16 @@
-#include <proc.h>
-#include <kmalloc.h>
-#include <string.h>
-#include <sync.h>
-#include <pmm.h>
-#include <error.h>
-#include <sched.h>
+#include <assert.h>
 #include <elf.h>
-#include <vmm.h>
-#include <trap.h>
+#include <error.h>
+#include <kmalloc.h>
+#include <pmm.h>
+#include <proc.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <string.h>
+#include <sync.h>
+#include <trap.h>
+#include <vmm.h>
 
 /* ------------- process/thread mechanism design&implementation -------------
 (an simplified Linux process/thread mechanism )
@@ -61,9 +61,9 @@ SYS_getpid      : get the process's pid
 // the process set's list
 list_entry_t proc_list;
 
-#define HASH_SHIFT          10
-#define HASH_LIST_SIZE      (1 << HASH_SHIFT)
-#define pid_hashfn(x)       (hash32(x, HASH_SHIFT))
+#define HASH_SHIFT 10
+#define HASH_LIST_SIZE (1 << HASH_SHIFT)
+#define pid_hashfn(x) (hash32(x, HASH_SHIFT))
 
 // has list for process set based on pid
 static list_entry_t hash_list[HASH_LIST_SIZE];
@@ -83,11 +83,13 @@ void switch_to(struct context *from, struct context *to);
 
 // alloc_proc - alloc a proc_struct and init all fields of proc_struct
 static struct proc_struct *
-alloc_proc(void) {
+alloc_proc(void)
+{
     struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
-    if (proc != NULL) {
-    //LAB4:EXERCISE1 YOUR CODE
-    /*
+    if (proc != NULL)
+    {
+        //LAB4:EXERCISE1 YOUR CODE
+        /*
      * below fields in proc_struct need to be initialized
      *       enum proc_state state;                      // Process state
      *       int pid;                                    // Process ID
@@ -103,19 +105,29 @@ alloc_proc(void) {
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
     }
+    proc->state = PROC_UNINIT;
+    proc->pid = -1;       //设置进程pid的未初始化值
+    proc->cr3 = boot_cr3; //所有内核线程共用同一个pdt
+    proc->parent = NULL;
+    proc->mm = NULL;
+    memset(&proc->context, 0, sizeof(struct context));
+    proc->tf = 0;
+
     return proc;
 }
 
 // set_proc_name - set the name of proc
 char *
-set_proc_name(struct proc_struct *proc, const char *name) {
+set_proc_name(struct proc_struct *proc, const char *name)
+{
     memset(proc->name, 0, sizeof(proc->name));
     return memcpy(proc->name, name, PROC_NAME_LEN);
 }
 
 // get_proc_name - get the name of proc
 char *
-get_proc_name(struct proc_struct *proc) {
+get_proc_name(struct proc_struct *proc)
+{
     static char name[PROC_NAME_LEN + 1];
     memset(name, 0, sizeof(name));
     return memcpy(name, proc->name, PROC_NAME_LEN);
@@ -123,32 +135,40 @@ get_proc_name(struct proc_struct *proc) {
 
 // get_pid - alloc a unique pid for process
 static int
-get_pid(void) {
+get_pid(void)
+{
     static_assert(MAX_PID > MAX_PROCESS);
     struct proc_struct *proc;
     list_entry_t *list = &proc_list, *le;
     static int next_safe = MAX_PID, last_pid = MAX_PID;
-    if (++ last_pid >= MAX_PID) {
+    if (++last_pid >= MAX_PID)
+    {
         last_pid = 1;
         goto inside;
     }
-    if (last_pid >= next_safe) {
+    if (last_pid >= next_safe)
+    {
     inside:
         next_safe = MAX_PID;
     repeat:
         le = list;
-        while ((le = list_next(le)) != list) {
+        while ((le = list_next(le)) != list)
+        {
             proc = le2proc(le, list_link);
-            if (proc->pid == last_pid) {
-                if (++ last_pid >= next_safe) {
-                    if (last_pid >= MAX_PID) {
+            if (proc->pid == last_pid)
+            {
+                if (++last_pid >= next_safe)
+                {
+                    if (last_pid >= MAX_PID)
+                    {
                         last_pid = 1;
                     }
                     next_safe = MAX_PID;
                     goto repeat;
                 }
             }
-            else if (proc->pid > last_pid && next_safe > proc->pid) {
+            else if (proc->pid > last_pid && next_safe > proc->pid)
+            {
                 next_safe = proc->pid;
             }
         }
@@ -158,9 +178,10 @@ get_pid(void) {
 
 // proc_run - make process "proc" running on cpu
 // NOTE: before call switch_to, should load  base addr of "proc"'s new PDT
-void
-proc_run(struct proc_struct *proc) {
-    if (proc != current) {
+void proc_run(struct proc_struct *proc)
+{
+    if (proc != current)
+    {
         bool intr_flag;
         struct proc_struct *prev = current, *next = proc;
         local_intr_save(intr_flag);
@@ -178,24 +199,30 @@ proc_run(struct proc_struct *proc) {
 // NOTE: the addr of forkret is setted in copy_thread function
 //       after switch_to, the current proc will execute here.
 static void
-forkret(void) {
+forkret(void)
+{
     forkrets(current->tf);
 }
 
 // hash_proc - add proc into proc hash_list
 static void
-hash_proc(struct proc_struct *proc) {
+hash_proc(struct proc_struct *proc)
+{
     list_add(hash_list + pid_hashfn(proc->pid), &(proc->hash_link));
 }
 
 // find_proc - find proc frome proc hash_list according to pid
 struct proc_struct *
-find_proc(int pid) {
-    if (0 < pid && pid < MAX_PID) {
+find_proc(int pid)
+{
+    if (0 < pid && pid < MAX_PID)
+    {
         list_entry_t *list = hash_list + pid_hashfn(pid), *le = list;
-        while ((le = list_next(le)) != list) {
+        while ((le = list_next(le)) != list)
+        {
             struct proc_struct *proc = le2proc(le, hash_link);
-            if (proc->pid == pid) {
+            if (proc->pid == pid)
+            {
                 return proc;
             }
         }
@@ -204,10 +231,10 @@ find_proc(int pid) {
 }
 
 // kernel_thread - create a kernel thread using "fn" function
-// NOTE: the contents of temp trapframe tf will be copied to 
+// NOTE: the contents of temp trapframe tf will be copied to
 //       proc->tf in do_fork-->copy_thread function
-int
-kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags) {
+int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
+{
     struct trapframe tf;
     memset(&tf, 0, sizeof(struct trapframe));
     tf.tf_cs = KERNEL_CS;
@@ -220,9 +247,11 @@ kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags) {
 
 // setup_kstack - alloc pages with size KSTACKPAGE as process kernel stack
 static int
-setup_kstack(struct proc_struct *proc) {
+setup_kstack(struct proc_struct *proc)
+{
     struct Page *page = alloc_pages(KSTACKPAGE);
-    if (page != NULL) {
+    if (page != NULL)
+    {
         proc->kstack = (uintptr_t)page2kva(page);
         return 0;
     }
@@ -231,14 +260,16 @@ setup_kstack(struct proc_struct *proc) {
 
 // put_kstack - free the memory space of process kernel stack
 static void
-put_kstack(struct proc_struct *proc) {
+put_kstack(struct proc_struct *proc)
+{
     free_pages(kva2page((void *)(proc->kstack)), KSTACKPAGE);
 }
 
 // copy_mm - process "proc" duplicate OR share process "current"'s mm according clone_flags
 //         - if clone_flags & CLONE_VM, then "share" ; else "duplicate"
 static int
-copy_mm(uint32_t clone_flags, struct proc_struct *proc) {
+copy_mm(uint32_t clone_flags, struct proc_struct *proc)
+{
     assert(current->mm == NULL);
     /* do nothing in this project */
     return 0;
@@ -247,7 +278,8 @@ copy_mm(uint32_t clone_flags, struct proc_struct *proc) {
 // copy_thread - setup the trapframe on the  process's kernel stack top and
 //             - setup the kernel entry point and stack of process
 static void
-copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
+copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf)
+{
     proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
     *(proc->tf) = *tf;
     proc->tf->tf_regs.reg_eax = 0;
@@ -263,11 +295,12 @@ copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
  * @stack:       the parent's user stack pointer. if stack==0, It means to fork a kernel thread.
  * @tf:          the trapframe info, which will be copied to child process's proc->tf
  */
-int
-do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
+int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
+{
     int ret = -E_NO_FREE_PROC;
     struct proc_struct *proc;
-    if (nr_process >= MAX_PROCESS) {
+    if (nr_process >= MAX_PROCESS)
+    { //超出最大进程数
         goto fork_out;
     }
     ret = -E_NO_MEM;
@@ -296,6 +329,24 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    5. insert proc_struct into hash_list && proc_list
     //    6. call wakeup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
+    proc = alloc_proc();
+    setup_kstack(proc);
+    // if(clone_flags&CLONE_VM){
+    //     proc->mm=proc->parent->mm;
+    // }
+    // else{
+    //     struct mm_struct* mm=malloc(sizeof(struct mm_struct));
+    //     mm=proc->parent->mm;
+    //     proc->mm=mm;
+    // }
+    copy_mm(clone_flags, proc);
+    copy_thread(proc, stack, tf);
+    proc->pid=get_pid();
+    hash_proc(proc);
+    list_add(&proc_list, &(proc->list_link));
+    wakeup_proc(proc);
+    ret=proc->pid;
+
 fork_out:
     return ret;
 
@@ -310,32 +361,35 @@ bad_fork_cleanup_proc:
 //   1. call exit_mmap & put_pgdir & mm_destroy to free the almost all memory space of process
 //   2. set process' state as PROC_ZOMBIE, then call wakeup_proc(parent) to ask parent reclaim itself.
 //   3. call scheduler to switch to other process
-int
-do_exit(int error_code) {
+int do_exit(int error_code)
+{
     panic("process exit!!.\n");
 }
 
 // init_main - the second kernel thread used to create user_main kernel threads
 static int
-init_main(void *arg) {
+init_main(void *arg)
+{
     cprintf("this initproc, pid = %d, name = \"%s\"\n", current->pid, get_proc_name(current));
     cprintf("To U: \"%s\".\n", (const char *)arg);
     cprintf("To U: \"en.., Bye, Bye. :)\"\n");
     return 0;
 }
 
-// proc_init - set up the first kernel thread idleproc "idle" by itself and 
+// proc_init - set up the first kernel thread idleproc "idle" by itself and
 //           - create the second kernel thread init_main
-void
-proc_init(void) {
+void proc_init(void)
+{
     int i;
 
     list_init(&proc_list);
-    for (i = 0; i < HASH_LIST_SIZE; i ++) {
+    for (i = 0; i < HASH_LIST_SIZE; i++)
+    {
         list_init(hash_list + i);
     }
 
-    if ((idleproc = alloc_proc()) == NULL) {
+    if ((idleproc = alloc_proc()) == NULL)
+    {
         panic("cannot alloc idleproc.\n");
     }
 
@@ -344,12 +398,13 @@ proc_init(void) {
     idleproc->kstack = (uintptr_t)bootstack;
     idleproc->need_resched = 1;
     set_proc_name(idleproc, "idle");
-    nr_process ++;
+    nr_process++;
 
     current = idleproc;
 
     int pid = kernel_thread(init_main, "Hello world!!", 0);
-    if (pid <= 0) {
+    if (pid <= 0)
+    {
         panic("create init_main failed.\n");
     }
 
@@ -361,12 +416,13 @@ proc_init(void) {
 }
 
 // cpu_idle - at the end of kern_init, the first kernel thread idleproc will do below works
-void
-cpu_idle(void) {
-    while (1) {
-        if (current->need_resched) {
+void cpu_idle(void)
+{
+    while (1)
+    {
+        if (current->need_resched)
+        {
             schedule();
         }
     }
 }
-
