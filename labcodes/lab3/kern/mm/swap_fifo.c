@@ -51,6 +51,7 @@ _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int
     //record the page access situlation
     /*LAB3 EXERCISE 2: YOUR CODE*/ 
     //(1)link the most recent arrival page at the back of the pra_list_head qeueue.
+    list_add(head,entry); //老是在想这其余参数有什么作用．．．
     return 0;
 }
 /*
@@ -58,7 +59,7 @@ _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int
  *                            then assign the value of *ptr_page to the addr of this page.
  */
 static int
-_fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick)
+_fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick) //为什么是二级指针
 {
      list_entry_t *head=(list_entry_t*) mm->sm_priv;
          assert(head != NULL);
@@ -67,6 +68,11 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
      /*LAB3 EXERCISE 2: YOUR CODE*/ 
      //(1)  unlink the  earliest arrival page in front of pra_list_head qeueue
      //(2)  assign the value of *ptr_page to the addr of this page
+    list_entry_t* le=head->prev; //seleect tail　这里可以理解了，因为之前是表头插入，所以新来的总是在表头，删去时间最长的在表尾部
+    assert(le!=NULL);
+    struct Page* page= le2page(le,pra_page_link); //???
+    list_del(le);
+    *ptr_page=page;
      return 0;
 }
 
