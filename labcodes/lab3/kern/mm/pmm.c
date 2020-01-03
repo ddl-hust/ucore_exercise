@@ -472,7 +472,7 @@ page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
             page_remove_pte(pgdir, la, ptep);
         }
     }
-    *ptep = page2pa(page) | PTE_P | perm;
+    *ptep = page2pa(page) | PTE_P | perm; //之前不存在的物理page加上PTE_P
     tlb_invalidate(pgdir, la);
     return 0;
 }
@@ -498,7 +498,7 @@ pgdir_alloc_page(pde_t *pgdir, uintptr_t la, uint32_t perm) {
             return NULL;
         }
         if (swap_init_ok){
-            swap_map_swappable(check_mm_struct, la, page, 0);
+            swap_map_swappable(check_mm_struct, la, page, 0); // 在FIFO算法里面 int swap 这个参数没有用到 la 也没有用到
             page->pra_vaddr=la;
             assert(page_ref(page) == 1);
             //cprintf("get No. %d  page: pra_vaddr %x, pra_link.prev %x, pra_link_next %x in pgdir_alloc_page\n", (page-pages), page->pra_vaddr,page->pra_page_link.prev, page->pra_page_link.next);

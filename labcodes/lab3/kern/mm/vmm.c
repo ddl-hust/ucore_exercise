@@ -307,7 +307,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     //try to find a vma which include addr
     struct vma_struct *vma = find_vma(mm, addr);
 
-    pgfault_num++;
+    pgfault_num++; //全局变量
     //If the addr is in the range of a mm's vma?
     if (vma == NULL || vma->vm_start > addr) {
         cprintf("not valid addr %x, and  can not find it in vma\n", addr);
@@ -317,7 +317,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     switch (error_code & 3) {
     default:
             /* error code flag : default is 3 ( W/R=1, P=1): write, present */
-    case 2: /* error code flag : (W/R=1, P=0): write, not present */
+    case 2: /* error code flag : (W/R=1, P=0): write, not present */ //这个很关键,这个虚拟地址没有写权限，这样即使页面不存在我们也不能够置换　
         if (!(vma->vm_flags & VM_WRITE)) {
             cprintf("do_pgfault failed: error code flag = write AND not present, but the addr's vma cannot write\n");
             goto failed;
@@ -332,7 +332,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
             goto failed;
         }
     }
-    /* IF (write an existed addr ) OR
+    /* IF (write an existed addr flag=3) OR
      *    (write an non_existed addr && addr is writable) OR
      *    (read  an non_existed addr && addr is readable)
      * THEN
@@ -378,7 +378,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     *
     *  Some Useful MACROs and DEFINEs, you can use them in below implementation.
     *  MACROs or Functions:
-    *    swap_in(mm, addr, &page) : alloc a memory page, then according to the swap entry in PTE for addr,
+    *    swap_in(mm, addr, &page) : alloc a memory page, then according to the swap entry(当pte不存在) in PTE for addr,
     *                               find the addr of disk page, read the content of disk page into this memroy page
     *    page_insert ： build the map of phy addr of an Page with the linear addr la
     *    swap_map_swappable ： set the page swappable
@@ -396,24 +396,22 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         }
    }
 #endif
-    ptep=get_pte(mm->pgdir,addr,1);
-    if(*ptep==0){
-        pgdir_alloc_page(mm->pgdir,addr,perm);
+    ptep=get_pte(mm->pgdir,addr,1);//
+    if(ptep==NULL) goto failed;
+    if(*ptep==0) {
+        if(pgdir_alloc_page(mm->pgdir,addr,perm)==NULL) goto failed;
     }
     else{
         if(swap_init_ok){
-        struct Page* page=NULL;    
-        swap_in(mm,addr,&page);
-        page_insert(mm->pgdir,page,addr,perm);
-        swap_map_swappable(mm,addr,page,1);
-        page->pra_vaddr=addr; //最开始写没注意到的
-        }
-        else {
-            cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
-            goto failed;
+            struct Page* page=NULL;
+            swap_in(mm,addr,&page); //从磁盘将addr对应page换入
+            page_insert(mm->pgdir,page,addr,perm); //建立la<->pa
+            swap_map_swappable(mm,addr,page,1); //终于明白了，还是要远观大局，对于FIFO这里实际上就是维护了一个page访问先后顺序的链表 addr，1实际读没有用到
+            page->pra_vaddr=addr;//在swap_out会用到的 将page置换到swap分区 但是提示没有这一步，有点坑
+
         }
     }
-   ret = 0;
+    ret=0; //表示正常返回
 failed:
     return ret;
 }

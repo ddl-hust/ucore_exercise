@@ -70,7 +70,7 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
      //(2)  assign the value of *ptr_page to the addr of this page
     list_entry_t* le=head->prev; //seleect tail　这里可以理解了，因为之前是表头插入，所以新来的总是在表头，删去时间最长的在表尾部
     assert(le!=NULL);
-    struct Page* page= le2page(le,pra_page_link); //???
+    struct Page* page= le2page(le,pra_page_link);
     list_del(le);
     *ptr_page=page;
      return 0;

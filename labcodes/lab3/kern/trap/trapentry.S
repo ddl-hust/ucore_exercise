@@ -17,7 +17,7 @@ __alltraps:
     movw %ax, %ds
     movw %ax, %es
 
-    # push %esp to pass a pointer to the trapframe as an argument to trap()
+    # push %esp to pass a pointer to the trapframe as an argument to trap() 之后通过 0x8(%ebp)获取
     pushl %esp
 
     # call trap(tf), where tf=%esp

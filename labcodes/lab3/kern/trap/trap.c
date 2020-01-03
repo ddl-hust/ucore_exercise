@@ -149,6 +149,7 @@ print_pgfault(struct trapframe *tf) {
      * bit 1 == 0 means read, 1 means write
      * bit 2 == 0 means kernel, 1 means user
      * */
+    //导致page fault 的linear addr 存在cr2
     cprintf("page fault at 0x%08x: %c/%c [%s].\n", rcr2(),
             (tf->tf_err & 4) ? 'U' : 'K',
             (tf->tf_err & 2) ? 'W' : 'R',
