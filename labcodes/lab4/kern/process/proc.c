@@ -184,7 +184,7 @@ void proc_run(struct proc_struct *proc)
     {
         bool intr_flag;
         struct proc_struct *prev = current, *next = proc;
-        local_intr_save(intr_flag);
+        local_intr_save(intr_flag);//屏蔽中断
         {
             current = proc;
             load_esp0(next->kstack + KSTACKSIZE);
