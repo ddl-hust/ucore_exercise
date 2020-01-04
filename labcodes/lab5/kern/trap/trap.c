@@ -58,6 +58,7 @@ idt_init(void) {
     for (i = 0; i < sizeof(idt) / sizeof(struct gatedesc); i ++) {
         SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
     }
+    SETGATE(idt[T_SYSCALL], 1, GD_KTEXT, __vectors[T_SYSCALL], DPL_USER);
     lidt(&idt_pd);
 }
 
@@ -226,9 +227,12 @@ trap_dispatch(struct trapframe *tf) {
         /* you should upate you lab1 code (just add ONE or TWO lines of code):
          *    Every TICK_NUM cycle, you should set current process's current->need_resched = 1
          */
+        // 时间片用完 设置进程 为 需要被调度
         ticks ++;
         if (ticks % TICK_NUM == 0) {
             print_ticks();
+            assert(current!=NULL);
+            current->need_resched=1;
         }
         break;
     case IRQ_OFFSET + IRQ_COM1:
